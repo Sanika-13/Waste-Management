@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CleanCity - Waste Management System</title>
+    <link rel="stylesheet" href="waste-styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+                <div class="nav-brand">
+                    <span class="brand-icon">♻️</span>
+                    <h1>CleanCity</h1>
+                    <span id="userInfo" class="hidden" style="margin-left: 1rem; color: var(--gray-500); font-size: 0.9rem;"></span>
+                </div>
+            <nav class="nav">
+                <a href="#" class="nav-link active" data-page="home">Home</a>
+                <a href="#" class="nav-link" data-page="dashboard">Dashboard</a>
+                <a href="#" class="nav-link" data-page="report">Report Problem</a>
+                <a href="#" class="nav-link" data-page="schedule">Collection Schedule</a>
+                <a href="#" class="nav-link hidden" data-page="admin" id="adminLink">Admin</a>
+                <a href="#" class="nav-link" data-page="about">About</a>
+                <a href="#" class="nav-link" data-page="login" id="loginLink">Login</a>
+                <a href="#" class="nav-link" data-page="signup" id="signupLink">Sign Up</a>
+                <a href="#" class="nav-link hidden" id="logoutLink">Logout</a>
+            </nav>
+        </div>
+    </header>
+
+    <main id="app" class="container">
+        <!-- Content will be rendered here -->
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div>
+                    <h3>CleanCity</h3>
+                    <p>Keep your neighborhood clean and green</p>
+                </div>
+                <div class="footer-links">
+                    <a href="#report">Report Issue</a>
+                    <a href="#schedule">Collection Schedule</a>
+                    <a href="mailto:support@cleancity.com">Contact Support</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 CleanCity. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Floating AI Chatbot -->
+    <div id="aiChatbot" class="hidden" style="position: fixed; bottom: 90px; right: 20px; width: 320px; max-height: 60vh; background: #ffffff; border: 1px solid var(--gray-200); box-shadow: var(--shadow-lg); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;">
+        <div style="display:flex; align-items:center; justify-content: space-between; padding: 0.75rem 1rem; background: var(--primary-green); color: #fff;">
+            <strong>CleanCity Assistant</strong>
+            <button id="chatCloseBtn" style="background: transparent; border: none; color: #fff; font-size: 1.25rem; cursor: pointer;">×</button>
+        </div>
+        <div id="chatMessages" style="padding: 0.75rem; overflow-y: auto; flex: 1;">
+            <div style="margin-bottom: 0.5rem; color: var(--gray-700);"><strong>Bot:</strong> Hi! Ask me about reporting issues, schedules, or using the app.</div>
+        </div>
+        <form id="chatForm" style="display:flex; gap:0.5rem; padding: 0.75rem; border-top: 1px solid var(--gray-200);">
+            <input id="chatInput" type="text" placeholder="Type your question..." style="flex:1; padding: 0.6rem; border: 2px solid var(--gray-200); border-radius: 8px;" required />
+            <button class="btn btn-primary" type="submit">Send</button>
+        </form>
+    </div>
+
+    <button id="chatToggle" title="Chat with us" style="position: fixed; right: 20px; bottom: 20px; width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--primary-green); color: #fff; font-size: 1.5rem; box-shadow: var(--shadow-lg); cursor: pointer;">💬</button>
+
+    <!-- Chart.js for Admin Dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <script>
+        // Simple storage helper
+        const storage = {
+            get: (key) => {
+                try {
+                    return JSON.parse(localStorage.getItem(key)) || [];
+                } catch {
+                    return [];
+                }
+            },
+            set: (key, data) => {
+                localStorage.setItem(key, JSON.stringify(data));
+            }
+        };
+
+        // Global reports data
+        let reports = storage.get('waste-reports');
+
+        // Auth + Users state
+        const AUTH_KEY = 'wm-auth';
+        const USERS_KEY = 'wm-users';
+        const ADMIN_CODE = 'CLEANCITY-ADMIN';
+        function getAuth(){
+            try { return JSON.parse(localStorage.getItem(AUTH_KEY)) || { role:'guest', name:'', email:'' }; }
+            catch { return { role:'guest', name:'', email:'' }; }
+        }
+        function setAuth(auth){ localStorage.setItem(AUTH_KEY, JSON.stringify(auth)); }
+        function clearAuth(){ localStorage.removeItem(AUTH_KEY); }
+        function getUsers(){
+            try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; }
+            catch { return []; }
+        }
+        function setUsers(list){ localStorage.setItem(USERS_KEY, JSON.stringify(list)); }
+
+        function updateNavForAuth(){
+            const auth = getAuth();
+            const adminLink = document.getElementById('adminLink');
+            const loginLink = document.getElementById('loginLink');
+            const signupLink = document.getElementById('signupLink');
+            const logoutLink = document.getElementById('logoutLink');
+            const userInfo = document.getElementById('userInfo');
+            const homeLink = document.querySelector('[data-page="home"]');
+            const dashboardLink = document.querySelector('[data-page="dashboard"]');
+            const reportLink = document.querySelector('[data-page="report"]');
+            const scheduleLink = document.querySelector('[data-page="schedule"]');
+            const aboutLink = document.querySelector('[data-page="about"]');
+            
+            if (auth.role === 'admin'){
+                // Show: Admin, Schedule, Logout; Hide: Home, Dashboard, Report, About, Login, Signup
+                adminLink.classList.remove('hidden');
+                scheduleLink.classList.remove('hidden');
+                logoutLink.classList.remove('hidden');
+                loginLink.classList.add('hidden');
+                signupLink.classList.add('hidden');
+                homeLink.classList.add('hidden');
+                dashboardLink.classList.add('hidden');
+                reportLink.classList.add('hidden');
+                aboutLink.classList.add('hidden');
+                userInfo.classList.remove('hidden');
+                userInfo.textContent = `👤 Admin: ${auth.name}`;
+            } else if (auth.role === 'user'){
+                // Show: Home, Dashboard, Report, About, Logout; Hide: Admin, Schedule, Login, Signup
+                adminLink.classList.add('hidden');
+                scheduleLink.classList.add('hidden');
+                loginLink.classList.add('hidden');
+                signupLink.classList.add('hidden');
+                logoutLink.classList.remove('hidden');
+                homeLink.classList.remove('hidden');
+                dashboardLink.classList.remove('hidden');
+                reportLink.classList.remove('hidden');
+                aboutLink.classList.remove('hidden');
+                userInfo.classList.remove('hidden');
+                userInfo.textContent = `👤 User: ${auth.name}`;
+            } else {
+                // Guest: show everything except Admin, Logout
+                adminLink.classList.add('hidden');
+                scheduleLink.classList.remove('hidden');
+                loginLink.classList.remove('hidden');
+                signupLink.classList.remove('hidden');
+                logoutLink.classList.add('hidden');
+                homeLink.classList.remove('hidden');
+                dashboardLink.classList.remove('hidden');
+                reportLink.classList.remove('hidden');
+                aboutLink.classList.remove('hidden');
+                userInfo.classList.add('hidden');
+                userInfo.textContent = '';
+            }
+        }
+
+        // Navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            const navLinks = document.querySelectorAll('.nav-link');
+            const appContainer = document.getElementById('app');
+
+            // Update nav based on auth at start
+            updateNavForAuth();
+
+            // Handle nav clicks
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+
+                    // Special: logout
+                    if (this.id === 'logoutLink'){
+                        clearAuth();
+                        updateNavForAuth();
+                        // Reset active to Home
+                        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                        document.querySelector('[data-page="home"]').classList.add('active');
+                        renderPage('home');
+                        return;
+                    }
+
+                    // Remove active from all
+                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                    // Add active to clicked
+                    this.classList.add('active');
+                    
+                    // Render page
+                    const page = this.dataset.page;
+                    renderPage(page);
+                });
+            });
+            
+            // Initialize with home page or admin if already logged in as admin and hash
+            const auth = getAuth();
+            const hashPage = (location.hash || '#home').replace('#','');
+            const initial = (auth.role === 'admin' && hashPage === 'admin') ? 'admin' : 'home';
+            renderPage(initial);
+        });
+
+        function renderPage(page) {
+            const appContainer = document.getElementById('app');
+            
+            switch(page) {
+                case 'home':
+                    renderHomePage();
+                    break;
+                case 'dashboard':
+                    renderDashboard();
+                    break;
+                case 'report':
+                    renderReportForm();
+                    break;
+                case 'schedule':
+                    renderSchedule();
+                    break;
+                case 'admin':
+                    renderAdminDashboard();
+                    break;
+                case 'login':
+                    renderLoginPage();
+                    break;
+                case 'signup':
+                    renderSignupPage();
+                    break;
+                case 'about':
+                    renderAboutPage();
+                    break;
+            }
+        }
+
+        function renderHomePage() {
+            const appContainer = document.getElementById('app');
+            const totalReports = reports.length;
+            const resolvedReports = reports.filter(r => r.status === 'resolved').length;
+            const resolutionRate = totalReports > 0 ? Math.round((resolvedReports / totalReports) * 100) : 0;
+            const auth = getAuth();
+            
+            // Welcome message based on login status
+            const welcomeText = auth.role !== 'guest' ? 
+                `Welcome back, ${auth.name}! Ready to help keep our city clean?` :
+                'Report waste issues, check collection schedules, and help build a cleaner, greener community.';
+            
+            appContainer.innerHTML = `
+                <div class="hero card">
+                    <h1>Keep Your Neighborhood Clean</h1>
+                    <p>${welcomeText}</p>
+                    <div class="hero-buttons">
+                        <button class="btn btn-primary" onclick="navigateToPage('report')">
+                            🗑️ Report an Issue
+                        </button>
+                        <button class="btn btn-secondary" onclick="navigateToPage('schedule')">
+                            📅 View Schedule
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats">
+                    <div class="card stat-card">
+                        <div class="stat-number">${totalReports}</div>
+                        <div class="stat-label">Total Reports</div>
+                    </div>
+                    <div class="card stat-card">
+                        <div class="stat-number">${resolutionRate}%</div>
+                        <div class="stat-label">Resolution Rate</div>
+                    </div>
+                    <div class="card stat-card">
+                        <div class="stat-number">${reports.filter(r => r.status === 'in-progress').length}</div>
+                        <div class="stat-label">In Progress</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 style="margin-bottom: 1.5rem">Recent Reports</h2>
+                    ${reports.length > 0 ? renderRecentReports() : 
+                        '<div style="padding: 2rem; text-align: center; color: var(--gray-500)"><p>No reports yet. Be the first to report a waste issue!</p></div>'
+                    }
+                </div>
+            `;
+        }
+
+        function renderRecentReports() {
+            const recentReports = reports.slice(0, 6);
+            return `
+                <div class="grid grid-3">
+                    ${recentReports.map(report => `
+                        <div class="card report-card">
+                            <div class="report-header">
+                                <div class="report-type">
+                                    ${getWasteTypeIcon(report.wasteType)} ${getWasteTypeLabel(report.wasteType)}
+                                </div>
+                                <div class="report-date">${formatDate(report.date)}</div>
+                            </div>
+                            <div class="report-location">📍 ${report.location}</div>
+                            <p style="color: var(--gray-600); font-size: 0.9rem; margin-bottom: 1rem">
+                                ${report.description}
+                            </p>
+                            <div style="font-size: 0.875rem; color: var(--gray-500)">
+                                Reported by: ${report.name}
+                            </div>
+                            ${report.photo ? `<img src="${report.photo}" alt="Report" class="report-image" />` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderDashboard() {
+            const appContainer = document.getElementById('app');
+            const auth = getAuth();
+            const myReports = auth.role === 'user' ? reports.filter(r => r.submittedBy === auth.email) : reports.filter(report => report.status !== 'admin-only');
+            const submittedReports = myReports.filter(r => r.status === 'submitted').length;
+            const inProgressReports = myReports.filter(r => r.status === 'in-progress').length;
+            const resolvedReports = myReports.filter(r => r.status === 'resolved').length;
+            
+            appContainer.innerHTML = `
+                <div class="admin-header">
+                    <h1 class="admin-title">My Dashboard ${auth.name ? '- ' + auth.name : ''}</h1>
+                    <div class="quick-actions">
+                        <button class="quick-action-btn" onclick="navigateToPage('report')">
+                            🗑️ New Report
+                        </button>
+                        <button class="quick-action-btn" onclick="navigateToPage('schedule')">
+                            📅 Schedule
+                        </button>
+                    </div>
+                </div>
+
+                <div class="kpi-cards">
+                    <div class="kpi-card">
+                        <div class="kpi-number">${submittedReports}</div>
+                        <div class="kpi-title">Pending</div>
+                        <div class="kpi-subtitle">Awaiting Review</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-number">${inProgressReports}</div>
+                        <div class="kpi-title">In Progress</div>
+                        <div class="kpi-subtitle">Being Addressed</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-number">${resolvedReports}</div>
+                        <div class="kpi-title">Resolved</div>
+                        <div class="kpi-subtitle">Completed</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-number">${myReports.length}</div>
+                        <div class="kpi-title">Total Reports</div>
+                        <div class="kpi-subtitle">All Time</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>My Recent Reports</h3>
+                    ${myReports.length > 0 ? renderMyReports(myReports) : 
+                        `<div style="padding: 2rem; text-align: center; color: var(--gray-500)">
+                            <p>No reports yet. Start by reporting a waste issue!</p>
+                            <button class="btn btn-primary" onclick="navigateToPage('report')">🗑️ Report Issue</button>
+                        </div>`
+                    }
+                </div>
+            `;
+        }
+
+        function renderMyReports(myReports) {
+            return `
+                <div class="grid grid-2" style="margin-top: 1rem">
+                    ${myReports.slice(0, 4).map(report => `
+                        <div style="padding: 1rem; border: 1px solid var(--gray-200); border-radius: 8px">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem">
+                                <span class="status-badge ${report.status}">
+                                    ${report.status}
+                                </span>
+                                <span style="font-size: 0.8rem; color: var(--gray-500)">
+                                    ${formatTimeAgo(report.date)}
+                                </span>
+                            </div>
+                            <h4 style="margin: 0 0 0.5rem; font-size: 1rem">${report.location}</h4>
+                            <p style="margin: 0; font-size: 0.9rem; color: var(--gray-600)">
+                                ${report.description.substring(0, 80)}...
+                            </p>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderReportForm() {
+            const auth = getAuth();
+            if (auth.role === 'guest'){
+                alert('Please login first to submit reports.');
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                document.getElementById('loginLink').classList.add('active');
+                renderPage('login');
+                return;
+            }
+            const appContainer = document.getElementById('app');
+            appContainer.innerHTML = `
+                <div class="card">
+                    <h2>Report a Waste Problem</h2>
+                    <p style="margin-bottom: 2rem; color: var(--gray-500)">
+                        Help us maintain a clean environment by reporting waste issues in your area.
+                    </p>
+                    
+                    <form class="form" onsubmit="handleReportSubmit(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="name">Your Name</label>
+                                <input type="text" id="name" name="name" placeholder="Enter your full name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="contact">Contact Information</label>
+                                <input type="text" id="contact" name="contact" placeholder="Phone number or email" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="location">Location</label>
+                            <input type="text" id="location" name="location" placeholder="Street address or landmark" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="wasteType">Type of Waste Issue</label>
+                            <select id="wasteType" name="wasteType" required>
+                                <option value="overflowing-garbage">🗑️ Overflowing Garbage Bin</option>
+                                <option value="illegal-dumping">🚫 Illegal Dumping</option>
+                                <option value="hazardous-waste">⚠️ Hazardous Waste</option>
+                                <option value="recycling-issue">♻️ Recycling Problem</option>
+                                <option value="other">❓ Other</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <textarea id="description" name="description" placeholder="Please describe the waste issue in detail..." required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Upload Photo (Optional)</label>
+                            <div class="file-input">
+                                <input type="file" id="photo" accept="image/*" onchange="handlePhotoSelect(event)">
+                                <div class="file-label">
+                                    <span>📷</span>
+                                    <span id="photoLabel">Choose Photo</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="photoPreview"></div>
+
+                        <button type="submit" class="btn btn-primary">📤 Submit Report</button>
+                    </form>
+                </div>
+            `;
+        }
+
+        function renderSchedule() {
+            const appContainer = document.getElementById('app');
+            const scheduleData = [
+                {
+                    zone: 'Zone A - Central',
+                    areas: ['Downtown', 'Main Street', 'City Center'],
+                    garbage: 'Monday & Thursday',
+                    recycling: 'Tuesday',
+                    hazardous: 'First Saturday of month'
+                },
+                {
+                    zone: 'Zone B - North',
+                    areas: ['Northside', 'Parkview', 'Hillcrest'],
+                    garbage: 'Tuesday & Friday',
+                    recycling: 'Wednesday',
+                    hazardous: 'Second Saturday of month'
+                },
+                {
+                    zone: 'Zone C - South',
+                    areas: ['Southdale', 'Riverside', 'Oak Valley'],
+                    garbage: 'Wednesday & Saturday',
+                    recycling: 'Thursday',
+                    hazardous: 'Third Saturday of month'
+                }
+            ];
+            
+            appContainer.innerHTML = `
+                <div class="card">
+                    <h2>Waste Collection Schedule</h2>
+                    <p style="margin-bottom: 2rem; color: var(--gray-500)">
+                        Check your area's waste collection schedule below. Please put bins out by 7:00 AM on collection days.
+                    </p>
+                </div>
+
+                <div class="grid grid-2">
+                    ${scheduleData.map(schedule => `
+                        <div class="card schedule-card">
+                            <div class="schedule-title">${schedule.zone}</div>
+                            <div class="schedule-areas">
+                                Areas: ${schedule.areas.join(', ')}
+                            </div>
+                            <div class="schedule-times">
+                                <div class="time-badge">🗑️ Garbage: ${schedule.garbage}</div>
+                                <div class="time-badge">♻️ Recycling: ${schedule.recycling}</div>
+                                <div class="time-badge">⚠️ Hazardous: ${schedule.hazardous}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="card">
+                    <h3>Collection Guidelines</h3>
+                    <div class="grid grid-2" style="margin-top: 1rem">
+                        <div>
+                            <h4 style="color: var(--primary-green); margin-bottom: 0.5rem">✅ Do's</h4>
+                            <ul style="padding-left: 1.5rem; color: var(--gray-600)">
+                                <li>Separate recyclables from regular waste</li>
+                                <li>Put bins out by 7:00 AM on collection day</li>
+                                <li>Keep lids closed to prevent spills</li>
+                                <li>Rinse containers before recycling</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 style="color: var(--primary-green); margin-bottom: 0.5rem">❌ Don'ts</h4>
+                            <ul style="padding-left: 1.5rem; color: var(--gray-600)">
+                                <li>Don't overfill bins</li>
+                                <li>Don't put hazardous waste in regular bins</li>
+                                <li>Don't leave bins out overnight</li>
+                                <li>Don't put electronics in regular waste</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAdminDashboard() {
+            const auth = getAuth();
+            if (auth.role !== 'admin'){
+                alert('Admin access only. Please login as admin.');
+                // Switch to login page
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                document.getElementById('loginLink').classList.add('active');
+                renderPage('login');
+                return;
+            }
+            const appContainer = document.getElementById('app');
+            const totalReports = reports.length;
+            const submittedReports = reports.filter(r => r.status === 'submitted').length;
+            const inProgressReports = reports.filter(r => r.status === 'in-progress').length;
+            const resolvedReports = reports.filter(r => r.status === 'resolved').length;
+            const resolutionRate = totalReports > 0 ? Math.round((resolvedReports / totalReports) * 100) : 0;
+            
+            appContainer.innerHTML = `
+                <div class="admin-header">
+                    <h1 class="admin-title">Admin Dashboard</h1>
+                    <div style="font-size: 1rem; color: var(--gray-600)">
+                        Waste Management System Overview
+                    </div>
+                </div>
+                
+                <div class="kpi-cards">
+                    <div class="kpi-card">
+                        <div class="kpi-number">${totalReports}</div>
+                        <div class="kpi-title">Total Reports</div>
+                        <div class="kpi-subtitle">All Time</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-number">${resolutionRate}%</div>
+                        <div class="kpi-title">Resolution Rate</div>
+                        <div class="kpi-subtitle">Success Rate</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-number">${submittedReports + inProgressReports}</div>
+                        <div class="kpi-title">Active Issues</div>
+                        <div class="kpi-subtitle">Need Attention</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-number">2.5d</div>
+                        <div class="kpi-title">Avg Response</div>
+                        <div class="kpi-subtitle">Time to Resolve</div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-3" style="margin-bottom: 2rem">
+                    <div class="chart-container">
+                        <div class="chart-title">Reports by Status</div>
+                        <canvas id="statusChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">Reports by Type</div>
+                        <canvas id="typeChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">Monthly Trend</div>
+                        <canvas id="trendChart" class="chart-canvas"></canvas>
+                    </div>
+                </div>
+                
+                <div class="reports-table">
+                    <div style="padding: 1.5rem 1.5rem 0">
+                        <h3 style="margin: 0">All Reports</h3>
+                        <p style="margin: 0.5rem 0 1rem; color: var(--gray-600)">Manage and track all waste management reports</p>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>Location</th>
+                                <th>Reporter</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${reports.map(report => `
+                                <tr>
+                                    <td>#${report.id.toString().slice(-4)}</td>
+                                    <td>${getWasteTypeLabel(report.wasteType)}</td>
+                                    <td>${report.location}</td>
+                                    <td>${report.name}</td>
+                                    <td>${formatDate(report.date)}</td>
+                                    <td>
+                                        <span class="status-badge ${report.status}">
+                                            ${report.status}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        ${report.status !== 'resolved' ? 
+                                            `<button class="action-btn resolve" onclick="updateReportStatus(${report.id}, '${report.status === 'submitted' ? 'in-progress' : 'resolved'}')">
+                                                ${report.status === 'submitted' ? 'Start' : 'Resolve'}
+                                            </button>` : ''
+                                        }
+                                    </td>
+                                </tr>
+                            `).join('')}
+                            ${reports.length === 0 ? 
+                                '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--gray-500)">No reports found</td></tr>' : ''
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            // Generate charts after rendering
+            setTimeout(generateAdminCharts, 100);
+        }
+
+        function renderLoginPage(){
+            const appContainer = document.getElementById('app');
+            appContainer.innerHTML = `
+                <div class="card" style="max-width: 520px; margin: 0 auto;">
+                    <h2>Login</h2>
+                    <p style="margin-bottom: 1rem; color: var(--gray-500)">Login as a citizen user or admin.</p>
+                    <form class="form" onsubmit="handleLogin(event)">
+                        <div class="form-group">
+                            <label>Login as</label>
+                            <div style="display:flex; gap:1rem; align-items:center;">
+                                <label style="display:inline-flex; align-items:center; gap:0.5rem;">
+                                    <input type="radio" name="login_role" value="user" checked>
+                                    <span>User</span>
+                                </label>
+                                <label style="display:inline-flex; align-items:center; gap:0.5rem;">
+                                    <input type="radio" name="login_role" value="admin">
+                                    <span>Admin</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email or Username</label>
+                            <input type="text" id="email" name="email" placeholder="you@example.com" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password" placeholder="••••••••" required />
+                        </div>
+                        <button type="submit" class="btn btn-primary">Login</button>
+                        <div style="font-size: 0.9rem; color: var(--gray-500)">No account? <a href="#" onclick="navigateToPage('signup'); return false;">Sign up</a></div>
+                    </form>
+                    <div style="margin-top: 1rem; color: var(--gray-500); font-size: 0.9rem;">
+                        <div><strong>Demo Admin:</strong> admin@cleancity.com / admin123</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleLogin(e){
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const selectedRole = (document.querySelector('input[name="login_role"]:checked') || {}).value || 'user';
+
+            // First, try local users
+            const users = getUsers();
+            const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+            if (user){
+                if (selectedRole && user.role !== selectedRole){
+                    alert(`This account is registered as ${user.role}. Please switch the login role to ${user.role}.`);
+                    return;
+                }
+                setAuth({ role:user.role, name:user.name || email.split('@')[0] || email, email:user.email });
+                updateNavForAuth();
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                if (user.role === 'admin'){
+                    const adminLink = document.getElementById('adminLink');
+                    adminLink.classList.remove('hidden');
+                    adminLink.classList.add('active');
+                    renderPage('admin');
+                } else {
+                    document.querySelector('[data-page="home"]').classList.add('active');
+                    renderPage('home');
+                }
+                return;
+            }
+
+            // Fallback demo admin
+            if ((email.toLowerCase() === 'admin@cleancity.com' || email.toLowerCase() === 'admin') && password === 'admin123'){
+                if (selectedRole !== 'admin'){
+                    alert('You selected User, but these are Admin credentials. Please switch role to Admin.');
+                    return;
+                }
+                setAuth({ role:'admin', name:'Administrator', email });
+                updateNavForAuth();
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                const adminLink = document.getElementById('adminLink');
+                adminLink.classList.remove('hidden');
+                adminLink.classList.add('active');
+                renderPage('admin');
+                return;
+            }
+
+            alert('Invalid credentials');
+        }
+
+        function renderSignupPage(){
+            const appContainer = document.getElementById('app');
+            appContainer.innerHTML = `
+                <div class="card" style="max-width: 520px; margin: 0 auto;">
+                    <h2>Create an Account</h2>
+                    <p style="margin-bottom: 1rem; color: var(--gray-500)">Sign up to report issues and track progress.</p>
+                    <form class="form" onsubmit="handleSignup(event)" id="signupForm">
+                        <div class="form-group">
+                            <label for="name">Name</label>
+                            <input type="text" id="su_name" name="name" placeholder="Your full name" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="su_email" name="email" placeholder="you@example.com" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" id="su_password" name="password" placeholder="Create a password" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="su_role">Role</label>
+                            <select id="su_role" name="role" required>
+                                <option value="user">User (Recommended)</option>
+                                <option value="admin">Admin (Requires Code)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="adminCodeWrap" style="display:none;">
+                            <label for="su_admin_code">Admin Access Code</label>
+                            <input type="text" id="su_admin_code" name="admin_code" placeholder="Enter admin code" />
+                            <div class="help">Use code: CLEANCITY-ADMIN (demo)</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Account</button>
+                        <div style="font-size: 0.9rem; color: var(--gray-500)">Already have an account? <a href="#" onclick="navigateToPage('login'); return false;">Login</a></div>
+                    </form>
+                </div>
+            `;
+            // Toggle admin code field
+            const roleSel = document.getElementById('su_role');
+            const codeWrap = document.getElementById('adminCodeWrap');
+            roleSel.addEventListener('change', ()=>{
+                codeWrap.style.display = roleSel.value === 'admin' ? 'block' : 'none';
+            });
+        }
+
+        function handleSignup(e){
+            e.preventDefault();
+            const name = document.getElementById('su_name').value.trim();
+            const email = document.getElementById('su_email').value.trim();
+            const password = document.getElementById('su_password').value.trim();
+            const role = document.getElementById('su_role').value;
+            const code = document.getElementById('su_admin_code') ? document.getElementById('su_admin_code').value.trim() : '';
+
+            const users = getUsers();
+            if (users.some(u => u.email.toLowerCase() === email.toLowerCase())){
+                alert('An account with this email already exists. Please login.');
+                navigateToPage('login');
+                return;
+            }
+
+            if (role === 'admin' && code !== ADMIN_CODE){
+                alert('Invalid admin access code.');
+                return;
+            }
+
+            const newUser = { name, email, password, role };
+            users.push(newUser);
+            setUsers(users);
+            setAuth({ role, name, email });
+            updateNavForAuth();
+
+            // Redirect after signup
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            if (role === 'admin'){
+                const adminLink = document.getElementById('adminLink');
+                adminLink.classList.remove('hidden');
+                adminLink.classList.add('active');
+                renderPage('admin');
+            } else {
+                document.querySelector('[data-page="home"]').classList.add('active');
+                renderPage('home');
+            }
+        }
+
+        function renderAboutPage() {
+            const appContainer = document.getElementById('app');
+            appContainer.innerHTML = `
+                <div class="card">
+                    <h2>About CleanCity</h2>
+                    <p style="font-size: 1.1rem; margin-bottom: 2rem; color: var(--gray-600)">
+                        CleanCity is a community-driven initiative to help residents actively participate in keeping their neighborhoods clean and environmentally sustainable.
+                    </p>
+                </div>
+
+                <div class="grid grid-2">
+                    <div class="card">
+                        <h3 style="color: var(--primary-green)">📧 Contact Information</h3>
+                        <div style="margin-top: 1rem">
+                            <p><strong>Email:</strong> support@cleancity.com</p>
+                            <p><strong>Phone:</strong> (555) 123-CLEAN</p>
+                            <p><strong>Emergency:</strong> (555) 911-WASTE</p>
+                            <p><strong>Hours:</strong> Mon-Fri 8AM-6PM</p>
+                        </div>
+                        <div style="margin-top: 1.5rem">
+                            <a href="mailto:support@cleancity.com" class="btn btn-primary">📧 Email Us</a>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3 style="color: var(--primary-green)">🌱 Our Mission</h3>
+                        <p style="margin-top: 1rem; color: var(--gray-600)">
+                            To create cleaner, healthier communities through citizen engagement, 
+                            efficient waste management, and environmental awareness. Together, 
+                            we can build a sustainable future for our neighborhoods.
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Utility functions
+        function navigateToPage(page) {
+            document.querySelector(`.nav-link[data-page="${page}"]`).click();
+        }
+
+        function handleReportSubmit(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const photo = document.getElementById('photoPreview').querySelector('img');
+            const auth = getAuth();
+            
+            const report = {
+                id: Date.now(),
+                name: formData.get('name'),
+                contact: formData.get('contact'),
+                location: formData.get('location'),
+                wasteType: formData.get('wasteType'),
+                description: formData.get('description'),
+                photo: photo ? photo.src : null,
+                date: new Date().toISOString(),
+                status: 'submitted',
+                submittedBy: auth.email || 'anonymous'
+            };
+            
+            reports.unshift(report);
+            storage.set('waste-reports', reports);
+            
+            alert('Report submitted successfully! Thank you for helping keep our community clean.');
+            event.target.reset();
+            document.getElementById('photoPreview').innerHTML = '';
+            document.getElementById('photoLabel').textContent = 'Choose Photo';
+        }
+
+        function handlePhotoSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('photoPreview').innerHTML = 
+                        `<img src="${e.target.result}" style="max-width: 200px; border-radius: 8px; margin-top: 1rem;" alt="Preview">`;
+                    document.getElementById('photoLabel').textContent = 'Photo Selected';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function updateReportStatus(id, newStatus) {
+            const report = reports.find(r => r.id === id);
+            if (report) {
+                report.status = newStatus;
+                report.updatedAt = new Date().toISOString();
+                storage.set('waste-reports', reports);
+                renderPage('admin');
+            }
+        }
+
+        function generateAdminCharts() {
+            if (!window.Chart) return;
+            
+            const submittedReports = reports.filter(r => r.status === 'submitted').length;
+            const inProgressReports = reports.filter(r => r.status === 'in-progress').length;
+            const resolvedReports = reports.filter(r => r.status === 'resolved').length;
+            
+            // Status Chart
+            const statusCtx = document.getElementById('statusChart');
+            if (statusCtx) {
+                new Chart(statusCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Submitted', 'In Progress', 'Resolved'],
+                        datasets: [{
+                            data: [submittedReports, inProgressReports, resolvedReports],
+                            backgroundColor: ['#3b82f6', '#f59e0b', '#22c55e'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'bottom' }
+                        }
+                    }
+                });
+            }
+            
+            // Type Chart
+            const typeData = {};
+            reports.forEach(report => {
+                typeData[report.wasteType] = (typeData[report.wasteType] || 0) + 1;
+            });
+            
+            const typeCtx = document.getElementById('typeChart');
+            if (typeCtx && Object.keys(typeData).length > 0) {
+                new Chart(typeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(typeData).map(key => getWasteTypeLabel(key)),
+                        datasets: [{
+                            label: 'Reports by Type',
+                            data: Object.values(typeData),
+                            backgroundColor: '#22c55e',
+                            borderRadius: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            }
+            
+            // Trend Chart
+            const trendCtx = document.getElementById('trendChart');
+            if (trendCtx) {
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+                const trendData = months.map(() => Math.floor(Math.random() * 20) + 5);
+                
+                new Chart(trendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: months,
+                        datasets: [{
+                            label: 'Monthly Reports',
+                            data: trendData,
+                            borderColor: '#22c55e',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Simple AI Chatbot
+        document.addEventListener('DOMContentLoaded', function(){
+            const toggle = document.getElementById('chatToggle');
+            const panel = document.getElementById('aiChatbot');
+            const closeBtn = document.getElementById('chatCloseBtn');
+            const form = document.getElementById('chatForm');
+            const input = document.getElementById('chatInput');
+            const messages = document.getElementById('chatMessages');
+
+            const reply = (text) => {
+                const div = document.createElement('div');
+                div.style.marginBottom = '0.5rem';
+                div.style.color = 'var(--gray-700)';
+                div.innerHTML = `<strong>Bot:</strong> ${text}`;
+                messages.appendChild(div);
+                messages.scrollTop = messages.scrollHeight;
+            };
+
+            const answer = (q) => {
+                const query = q.toLowerCase();
+                if (query.includes('report') || query.includes('issue') || query.includes('complaint')) {
+                    return 'To report an issue, go to Report Problem, fill details, and submit. If you are not logged in, please log in first.';
+                }
+                if (query.includes('schedule') || query.includes('collection')) {
+                    return 'Collection schedules are under Collection Schedule. Select your zone to view garbage, recycling, and hazardous pickup days.';
+                }
+                if (query.includes('login') || query.includes('sign') || query.includes('account')) {
+                    return 'Use Login to access your account. New users can Sign Up. Admins need the code CLEANCITY-ADMIN during signup.';
+                }
+                if (query.includes('admin')) {
+                    return 'Admins can access the Admin Dashboard to manage reports. Use admin credentials on the Login page and select Admin role.';
+                }
+                return 'I can help with reporting issues, schedules, login/signup, and admin. Try asking: "How do I report an issue?"';
+            };
+
+            toggle.addEventListener('click', () => {
+                panel.classList.toggle('hidden');
+            });
+            closeBtn.addEventListener('click', () => panel.classList.add('hidden'));
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const text = input.value.trim();
+                if (!text) return;
+                const userDiv = document.createElement('div');
+                userDiv.style.marginBottom = '0.5rem';
+                userDiv.style.color = 'var(--gray-700)';
+                userDiv.innerHTML = `<strong>You:</strong> ${text}`;
+                messages.appendChild(userDiv);
+                messages.scrollTop = messages.scrollHeight;
+                input.value = '';
+
+                setTimeout(() => reply(answer(text)), 200);
+            });
+        });
+
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString();
+        }
+
+        function formatTimeAgo(dateString) {
+            const now = new Date();
+            const date = new Date(dateString);
+            const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
+            
+            if (diffInHours < 1) return 'Just now';
+            if (diffInHours < 24) return `${diffInHours}h ago`;
+            return `${Math.floor(diffInHours / 24)}d ago`;
+        }
+
+        function getWasteTypeIcon(type) {
+            const icons = {
+                'overflowing-garbage': '🗑️',
+                'illegal-dumping': '🚫',
+                'hazardous-waste': '⚠️',
+                'recycling-issue': '♻️',
+                'other': '❓'
+            };
+            return icons[type] || '❓';
+        }
+
+        function getWasteTypeLabel(type) {
+            const labels = {
+                'overflowing-garbage': 'Overflowing Garbage',
+                'illegal-dumping': 'Illegal Dumping',
+                'hazardous-waste': 'Hazardous Waste',
+                'recycling-issue': 'Recycling Issue',
+                'other': 'Other'
+            };
+            return labels[type] || 'Other';
+        }
+    </script>
+</body>
+</html>

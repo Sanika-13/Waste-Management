@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CleanCity - Waste Management System</title>
+    <link rel="stylesheet" href="waste-styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="brand-icon">♻️</span>
+                <h1>CleanCity</h1>
+            </div>
+            <nav class="nav">
+                <a href="#home" class="nav-link active" data-page="home">Home</a>
+                <a href="#dashboard" class="nav-link" data-page="dashboard">Dashboard</a>
+                <a href="#report" class="nav-link" data-page="report">Report Problem</a>
+                <a href="#schedule" class="nav-link" data-page="schedule">Collection Schedule</a>
+                <a href="#admin" class="nav-link" data-page="admin">Admin</a>
+                <a href="#about" class="nav-link" data-page="about">About</a>
+                <a href="#signup" class="nav-link" data-page="signup">Sign Up</a>
+            </nav>
+        </div>
+    </header>
+
+    <main id="app" class="container">
+        <!-- Content will be rendered here -->
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div>
+                    <h3>CleanCity</h3>
+                    <p>Keep your neighborhood clean and green</p>
+                </div>
+                <div class="footer-links">
+                    <a href="#report">Report Issue</a>
+                    <a href="#schedule">Collection Schedule</a>
+                    <a href="mailto:support@cleancity.com">Contact Support</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 CleanCity. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- React and Babel for simple JSX -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Charts for Admin Dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <!-- Simple Navigation Test -->
+    <script>
+        // Simple test to see if navigation works
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded');
+            const navLinks = document.querySelectorAll('.nav-link');
+            console.log('Found nav links:', navLinks.length);
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Nav clicked:', this.dataset.page);
+                    
+                    // Remove active from all
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    // Add active to clicked
+                    this.classList.add('active');
+                    
+                    // Simple page switching
+                    const page = this.dataset.page;
+                    const appContainer = document.getElementById('app');
+                    
+                    switch(page) {
+                        case 'home':
+                            appContainer.innerHTML = '<div class="card"><h1>Home Page</h1><p>Welcome to CleanCity Waste Management</p></div>';
+                            break;
+                        case 'dashboard':
+                            appContainer.innerHTML = '<div class="card"><h1>User Dashboard</h1><p>Your personal dashboard</p></div>';
+                            break;
+                        case 'report':
+                            appContainer.innerHTML = '<div class="card"><h1>Report Problem</h1><p>Report a waste issue</p></div>';
+                            break;
+                        case 'schedule':
+                            appContainer.innerHTML = '<div class="card"><h1>Collection Schedule</h1><p>View collection schedules</p></div>';
+                            break;
+                        case 'admin':
+                            appContainer.innerHTML = '<div class="card"><h1>Admin Dashboard</h1><p>Administrative overview</p></div>';
+                            break;
+                        case 'about':
+                            appContainer.innerHTML = '<div class="card"><h1>About</h1><p>About CleanCity</p></div>';
+                            break;
+                        case 'signup':
+                            appContainer.innerHTML = '<div class="card" style="max-width:520px;margin:0 auto;"><h1>Sign Up</h1><p>Use the Sign Up page from the app to create an account.</p></div>';
+                            break;
+                    }
+                });
+            });
+            
+            // Initialize with home page
+            document.getElementById('app').innerHTML = '<div class="card"><h1>Home Page</h1><p>Welcome to CleanCity Waste Management System</p><p>Click the navigation links above to test the interface.</p></div>';
+        });
+    </script>
+    
+    <script type="text/babel" data-presets="react" src="waste-app.js"></script>
+</body>
+</html>
